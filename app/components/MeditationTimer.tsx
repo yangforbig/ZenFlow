@@ -17,6 +17,8 @@ const MEDITATION_TYPES = [
   { name: 'Mindfulness', description: 'Present moment awareness', icon: '🍃', sound: '/sounds/ambient-mindfulness.mp3' },
 ];
 
+const STORAGE_KEY = 'zenflow_meditation_feedback';
+
 const createInitialFeedback = () => {
   const feedback: {[key: string]: {likes: number, dislikes: number}} = {};
   MEDITATION_TYPES.forEach(type => {
@@ -192,14 +194,27 @@ export default function MeditationTimer() {
     };
   }, [isActive, timeLeft]);
 
+  // Load feedback from localStorage on component mount
+  useEffect(() => {
+    const savedFeedback = localStorage.getItem(STORAGE_KEY);
+    if (savedFeedback) {
+      setMeditationFeedback(JSON.parse(savedFeedback));
+    }
+  }, []);
+
   const handleFeedback = (typeName: string, isLike: boolean) => {
-    setMeditationFeedback(prev => ({
-      ...prev,
-      [typeName]: {
-        likes: prev[typeName].likes + (isLike ? 1 : 0),
-        dislikes: prev[typeName].dislikes + (!isLike ? 1 : 0),
-      }
-    }));
+    setMeditationFeedback(prev => {
+      const newFeedback = {
+        ...prev,
+        [typeName]: {
+          likes: prev[typeName].likes + (isLike ? 1 : 0),
+          dislikes: prev[typeName].dislikes + (!isLike ? 1 : 0),
+        }
+      };
+      // Save to localStorage whenever feedback changes
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newFeedback));
+      return newFeedback;
+    });
   };
 
   if (!mounted) {
