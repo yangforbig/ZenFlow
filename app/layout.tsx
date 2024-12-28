@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Peaceful Mind",
-  description: "A peaceful meditation app to help you find your inner calm",
+  title: "ZenFlow",
+  description: "Find your flow state through mindful meditation",
 };
 
 export default function RootLayout({
