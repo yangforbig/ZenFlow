@@ -194,27 +194,35 @@ export default function MeditationTimer() {
     };
   }, [isActive, timeLeft]);
 
-  // Load feedback from localStorage on component mount
+  // Load global feedback on mount
   useEffect(() => {
-    const savedFeedback = localStorage.getItem(STORAGE_KEY);
-    if (savedFeedback) {
-      setMeditationFeedback(JSON.parse(savedFeedback));
-    }
+    fetch('/api/feedback')
+      .then(res => res.json())
+      .then(data => {
+        const feedbackData = Object.fromEntries(
+          Object.entries(data).filter(([key]) => key !== '_id')
+        );
+        setMeditationFeedback(feedbackData);
+      })
+      .catch(console.error);
   }, []);
 
-  const handleFeedback = (typeName: string, isLike: boolean) => {
-    setMeditationFeedback(prev => {
-      const newFeedback = {
-        ...prev,
-        [typeName]: {
-          likes: prev[typeName].likes + (isLike ? 1 : 0),
-          dislikes: prev[typeName].dislikes + (!isLike ? 1 : 0),
-        }
-      };
-      // Save to localStorage whenever feedback changes
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newFeedback));
-      return newFeedback;
-    });
+  const handleFeedback = async (typeName: string, isLike: boolean) => {
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ typeName, isLike })
+      });
+      
+      const data = await response.json();
+      const feedbackData = Object.fromEntries(
+        Object.entries(data).filter(([key]) => key !== '_id')
+      );
+      setMeditationFeedback(feedbackData);
+    } catch (error) {
+      console.error('Failed to update feedback:', error);
+    }
   };
 
   if (!mounted) {
