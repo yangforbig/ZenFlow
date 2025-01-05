@@ -5,9 +5,8 @@ export interface MeditationType {
 }
 
 export interface FeedbackDocument {
-  _id: string;
-  Breathing: MeditationType;
-  'Body Scan': MeditationType;
-  'Loving-Kindness': MeditationType;
-  Mindfulness: MeditationType;
+  Breathing: { likes: number; dislikes: number };
+  'Body Scan': { likes: number; dislikes: number };
+  'Loving-Kindness': { likes: number; dislikes: number };
+  Mindfulness: { likes: number; dislikes: number };
 } 

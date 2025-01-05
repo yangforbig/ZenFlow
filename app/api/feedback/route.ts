@@ -1,25 +1,42 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import type { FeedbackDocument } from '@/types/feedback';
+import { ObjectId } from 'mongodb';
+
+const INITIAL_FEEDBACK = {
+  Breathing: { likes: 0, dislikes: 0 },
+  'Body Scan': { likes: 0, dislikes: 0 },
+  'Loving-Kindness': { likes: 0, dislikes: 0 },
+  Mindfulness: { likes: 0, dislikes: 0 }
+};
 
 export async function GET() {
   try {
     const client = await clientPromise;
     const db = client.db("zenflow");
-    const feedback = await db.collection<FeedbackDocument>("feedback").findOne(
+    
+    // Find existing feedback
+    const feedback = await db.collection("feedback").findOne(
       { _id: 'feedback_stats' }
     );
     
     console.log('GET Feedback:', feedback);
     
     if (!feedback) {
-      return NextResponse.json(createInitialFeedback());
+      // Create initial feedback if none exists
+      await db.collection("feedback").insertOne({
+        _id: 'feedback_stats',
+        ...INITIAL_FEEDBACK
+      });
+      return NextResponse.json(INITIAL_FEEDBACK);
     }
     
-    return NextResponse.json(feedback);
+    // Remove _id from response
+    const { _id, ...feedbackData } = feedback;
+    return NextResponse.json(feedbackData);
   } catch (e) {
     console.error('Database error:', e);
-    return NextResponse.json(createInitialFeedback());
+    return NextResponse.json(INITIAL_FEEDBACK);
   }
 }
 
@@ -31,38 +48,36 @@ export async function POST(request: Request) {
     const client = await clientPromise;
     const db = client.db("zenflow");
     
-    const update = isLike 
-      ? { [`${typeName}.likes`]: 1 }
-      : { [`${typeName}.dislikes`]: 1 };
-    
-    console.log('Update operation:', update);
-    
-    const result = await db.collection<FeedbackDocument>("feedback").updateOne(
+    // Ensure document exists
+    await db.collection("feedback").updateOne(
       { _id: 'feedback_stats' },
-      { $inc: update },
+      { 
+        $setOnInsert: INITIAL_FEEDBACK
+      },
       { upsert: true }
     );
+
+    // Update the feedback count
+    const updateField = isLike ? 'likes' : 'dislikes';
+    await db.collection("feedback").updateOne(
+      { _id: 'feedback_stats' },
+      { $inc: { [`${typeName}.${updateField}`]: 1 } }
+    );
     
-    console.log('Update result:', result);
-    
-    const updatedFeedback = await db.collection<FeedbackDocument>("feedback").findOne(
+    // Get updated feedback
+    const updatedFeedback = await db.collection("feedback").findOne(
       { _id: 'feedback_stats' }
     );
     
-    console.log('Updated feedback:', updatedFeedback);
-    return NextResponse.json(updatedFeedback || createInitialFeedback());
+    if (!updatedFeedback) {
+      return NextResponse.json(INITIAL_FEEDBACK);
+    }
+    
+    // Remove _id from response
+    const { _id, ...feedbackData } = updatedFeedback;
+    return NextResponse.json(feedbackData);
   } catch (e) {
     console.error('Database error:', e);
-    return NextResponse.json(createInitialFeedback());
+    return NextResponse.json(INITIAL_FEEDBACK);
   }
-}
-
-function createInitialFeedback(): FeedbackDocument {
-  return {
-    _id: 'feedback_stats',
-    Breathing: { name: 'Breathing', likes: 0, dislikes: 0 },
-    'Body Scan': { name: 'Body Scan', likes: 0, dislikes: 0 },
-    'Loving-Kindness': { name: 'Loving-Kindness', likes: 0, dislikes: 0 },
-    Mindfulness: { name: 'Mindfulness', likes: 0, dislikes: 0 }
-  };
 } 

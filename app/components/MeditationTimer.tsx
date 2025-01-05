@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FeedbackDocument } from '@/types/feedback';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 const MEDITATION_TIMES = [
   { label: '5 mins', seconds: 300 },
@@ -31,6 +33,15 @@ type FeedbackState = {
   [key: string]: { likes: number; dislikes: number };
 };
 
+// Add a validation function
+const isValidFeedbackData = (data: any): data is FeedbackDocument => {
+  return data 
+    && data.Breathing?.likes !== undefined
+    && data['Body Scan']?.likes !== undefined
+    && data['Loving-Kindness']?.likes !== undefined
+    && data.Mindfulness?.likes !== undefined;
+};
+
 export default function MeditationTimer() {
   const [mounted, setMounted] = useState(false);
   const [isActive, setIsActive] = useState(false);
@@ -41,24 +52,45 @@ export default function MeditationTimer() {
   const [customMinutes, setCustomMinutes] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [meditationFeedback, setMeditationFeedback] = useState(createInitialFeedback);
+  const [votedTypes, setVotedTypes] = useState<Set<string>>(new Set());
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeInterval = useRef<NodeJS.Timeout | null>(null);
+  const isAudioSwitching = useRef(false);
 
   useEffect(() => {
     setMounted(true);
     
-    audioRef.current = new Audio(selectedType.sound);
-    audioRef.current.loop = true;
-    audioRef.current.volume = 0;
+    try {
+      // Cleanup old audio if exists
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+      
+      // Create new audio instance
+      audioRef.current = new Audio(selectedType.sound);
+      audioRef.current.loop = true;
+      audioRef.current.volume = 0;
+      
+      // Preload the audio
+      audioRef.current.load();
+    } catch (error) {
+      console.error('Error setting up audio:', error);
+    }
 
     return () => {
       if (fadeInterval.current) {
         clearInterval(fadeInterval.current);
       }
       if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+        try {
+          audioRef.current.pause();
+          audioRef.current.src = '';
+          audioRef.current = null;
+        } catch (error) {
+          console.error('Error cleaning up audio:', error);
+        }
       }
     };
   }, [selectedType.sound]);
@@ -66,20 +98,19 @@ export default function MeditationTimer() {
   const fadeIn = useCallback(() => {
     if (!audioRef.current) return;
     
-    audioRef.current.volume = 0;
-    audioRef.current.play();
-    
     let currentVolume = 0;
-    fadeInterval.current = setInterval(() => {
+    audioRef.current.volume = currentVolume;
+    
+    const fadeInInterval = setInterval(() => {
       currentVolume = Math.min(currentVolume + 0.05, volume);
       if (audioRef.current) {
         audioRef.current.volume = currentVolume;
       }
       
       if (currentVolume >= volume) {
-        if (fadeInterval.current) clearInterval(fadeInterval.current);
+        clearInterval(fadeInInterval);
       }
-    }, 100);
+    }, 50);
   }, [volume]);
 
   const fadeOut = () => {
@@ -90,38 +121,63 @@ export default function MeditationTimer() {
       }
 
       let currentVolume = audioRef.current.volume;
-      fadeInterval.current = setInterval(() => {
+      const fadeOutInterval = setInterval(() => {
         currentVolume = Math.max(currentVolume - 0.05, 0);
         if (audioRef.current) {
           audioRef.current.volume = currentVolume;
         }
         
         if (currentVolume <= 0) {
-          if (fadeInterval.current) clearInterval(fadeInterval.current);
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-          }
+          clearInterval(fadeOutInterval);
           resolve();
         }
-      }, 100);
+      }, 50);
     });
   };
 
   const startMeditation = useCallback(() => {
-    if (!mounted) return;
+    if (!mounted || !audioRef.current) return;
+    
     setIsActive(true);
-    if (audioRef.current && volume > 0) {
-      fadeIn();
+    if (volume > 0) {
+      audioRef.current.play().then(() => {
+        fadeIn();
+      }).catch(error => {
+        console.error('Error starting meditation:', error);
+      });
     }
   }, [mounted, volume, fadeIn]);
 
   const stopMeditation = useCallback(async () => {
     if (!mounted) return;
-    await fadeOut();
-    setIsActive(false);
-    setTimeLeft(selectedTime);
-  }, [mounted, selectedTime]);
+    
+    // Force stop immediately if there's no audio
+    if (!audioRef.current) {
+      setIsActive(false);
+      setTimeLeft(selectedTime);
+      return;
+    }
+
+    try {
+      // Add a timeout to prevent hanging
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1000));
+      await Promise.race([fadeOut(), timeoutPromise]);
+    } catch (error) {
+      console.error('Error in stopMeditation:', error);
+    } finally {
+      // Always stop the meditation, even if fadeOut fails
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        } catch (error) {
+          console.error('Error stopping audio:', error);
+        }
+      }
+      setIsActive(false);
+      setTimeLeft(selectedTime);
+    }
+  }, [mounted, selectedTime, fadeOut]);
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
@@ -131,18 +187,48 @@ export default function MeditationTimer() {
   };
 
   const handleTypeSelection = async (type: typeof MEDITATION_TYPES[0]) => {
-    if (isActive) {
-      await fadeOut();
-    }
-    
-    setSelectedType(type);
-    if (audioRef.current) {
-      audioRef.current.src = type.sound;
-      audioRef.current.loop = true;
+    try {
+      if (type.name === selectedType.name) return;
       
-      if (isActive && volume > 0) {
-        fadeIn();
+      // Update type immediately
+      setSelectedType(type);
+
+      // Handle audio switching
+      const newAudio = new Audio(type.sound);
+      newAudio.loop = true;
+      
+      // If currently playing, switch audio with fade
+      if (isActive) {
+        // Start loading new audio
+        await newAudio.load();
+        
+        // Fade out current audio
+        if (audioRef.current) {
+          await fadeOut();
+          audioRef.current.pause();
+        }
+        
+        // Set up new audio
+        newAudio.volume = 0;
+        audioRef.current = newAudio;
+        
+        // Play and fade in new audio
+        try {
+          await newAudio.play();
+          fadeIn();
+        } catch (error) {
+          console.error('Error playing new audio:', error);
+        }
+      } else {
+        // If not playing, just update the audio reference
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        audioRef.current = newAudio;
+        audioRef.current.volume = volume;
       }
+    } catch (error) {
+      console.error('Error in handleTypeSelection:', error);
     }
   };
 
@@ -201,31 +287,45 @@ export default function MeditationTimer() {
   useEffect(() => {
     fetch('/api/feedback')
       .then(res => res.json())
-      .then((data: FeedbackDocument) => {
+      .then((data: any) => {
+        if (!isValidFeedbackData(data)) {
+          console.error('Invalid feedback data received:', data);
+          return setMeditationFeedback(createInitialFeedback());
+        }
+
         const feedbackData: FeedbackState = {
           'Breathing': { 
-            likes: data.Breathing.likes, 
-            dislikes: data.Breathing.dislikes 
+            likes: data.Breathing.likes || 0, 
+            dislikes: data.Breathing.dislikes || 0 
           },
           'Body Scan': { 
-            likes: data['Body Scan'].likes, 
-            dislikes: data['Body Scan'].dislikes 
+            likes: data['Body Scan'].likes || 0, 
+            dislikes: data['Body Scan'].dislikes || 0 
           },
           'Loving-Kindness': { 
-            likes: data['Loving-Kindness'].likes, 
-            dislikes: data['Loving-Kindness'].dislikes 
+            likes: data['Loving-Kindness'].likes || 0, 
+            dislikes: data['Loving-Kindness'].dislikes || 0 
           },
           'Mindfulness': { 
-            likes: data.Mindfulness.likes, 
-            dislikes: data.Mindfulness.dislikes 
+            likes: data.Mindfulness.likes || 0, 
+            dislikes: data.Mindfulness.dislikes || 0 
           }
         };
         setMeditationFeedback(feedbackData);
       })
-      .catch(console.error);
+      .catch(error => {
+        console.error('Failed to fetch feedback:', error);
+        setMeditationFeedback(createInitialFeedback());
+      });
   }, []);
 
   const handleFeedback = async (typeName: string, isLike: boolean) => {
+    // Check if user has already voted for this type
+    if (votedTypes.has(typeName)) {
+      toast.info('You have already voted for this meditation type!');
+      return;
+    }
+
     try {
       const response = await fetch('/api/feedback', {
         method: 'POST',
@@ -233,30 +333,40 @@ export default function MeditationTimer() {
         body: JSON.stringify({ typeName, isLike })
       });
       
-      const data: FeedbackDocument = await response.json();
-      const feedbackData: FeedbackState = {
-        'Breathing': { 
-          likes: data.Breathing.likes, 
-          dislikes: data.Breathing.dislikes 
-        },
-        'Body Scan': { 
-          likes: data['Body Scan'].likes, 
-          dislikes: data['Body Scan'].dislikes 
-        },
-        'Loving-Kindness': { 
-          likes: data['Loving-Kindness'].likes, 
-          dislikes: data['Loving-Kindness'].dislikes 
-        },
-        'Mindfulness': { 
-          likes: data.Mindfulness.likes, 
-          dislikes: data.Mindfulness.dislikes 
-        }
-      };
-      setMeditationFeedback(feedbackData);
+      const data = await response.json();
+      
+      if (!isValidFeedbackData(data)) {
+        console.error('Invalid feedback data received:', data);
+        return setMeditationFeedback(createInitialFeedback());
+      }
+
+      // Update feedback state
+      setMeditationFeedback(data);
+      
+      // Add type to voted set and save to localStorage
+      const newVotedTypes = new Set(votedTypes).add(typeName);
+      setVotedTypes(newVotedTypes);
+      localStorage.setItem('votedTypes', JSON.stringify([...newVotedTypes]));
+      
+      // Show success message
+      toast.success('Thank you for your feedback!');
     } catch (error) {
       console.error('Failed to update feedback:', error);
+      toast.error('Failed to submit feedback. Please try again.');
     }
   };
+
+  useEffect(() => {
+    console.log('Current feedback state:', meditationFeedback);
+  }, [meditationFeedback]);
+
+  // Add this useEffect to load voted types from localStorage
+  useEffect(() => {
+    const savedVotes = localStorage.getItem('votedTypes');
+    if (savedVotes) {
+      setVotedTypes(new Set(JSON.parse(savedVotes)));
+    }
+  }, []);
 
   if (!mounted) {
     return (
@@ -280,33 +390,68 @@ export default function MeditationTimer() {
           <div key={type.name} className="flex flex-col h-full">
             <button
               onClick={() => handleTypeSelection(type)}
-              className={`flex-1 p-4 rounded-2xl transition-all duration-300 flex flex-col items-center text-center ${
+              className={`flex-1 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all ${
                 selectedType.name === type.name
-                  ? 'bg-white dark:bg-gray-800 shadow-lg scale-105'
-                  : 'bg-white/50 dark:bg-gray-800/50 hover:scale-102'
+                  ? 'bg-indigo-100 dark:bg-indigo-900'
+                  : 'bg-white/50 dark:bg-gray-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/50'
               }`}
             >
-              <div className="text-3xl mb-2">{type.icon}</div>
-              <div className="font-medium text-gray-800 dark:text-white">{type.name}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400 flex-1">{type.description}</div>
+              <span className="text-4xl mb-2">{type.icon}</span>
+              <h3 className="font-semibold text-gray-800 dark:text-white">{type.name}</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300 text-center">
+                {type.description}
+              </p>
             </button>
             
-            {/* Feedback Buttons */}
+            {/* Feedback Section */}
             <div className="flex justify-center gap-4 mt-2">
-              <button
+              <motion.button
                 onClick={() => handleFeedback(type.name, true)}
-                className="group flex items-center gap-1 text-gray-600 dark:text-gray-400 hover:text-green-500 dark:hover:text-green-400 transition-colors"
+                className={`flex items-center gap-1 transition-colors ${
+                  votedTypes.has(type.name)
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-green-500'
+                }`}
+                disabled={votedTypes.has(type.name)}
+                whileTap={{ scale: votedTypes.has(type.name) ? 1 : 0.95 }}
               >
-                <span className="text-lg">👍</span>
-                <span className="text-sm">{meditationFeedback[type.name].likes}</span>
-              </button>
-              <button
+                👍
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={meditationFeedback[type.name]?.likes || 0}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="text-sm"
+                  >
+                    {meditationFeedback[type.name]?.likes ?? 0}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.button>
+              
+              <motion.button
                 onClick={() => handleFeedback(type.name, false)}
-                className="group flex items-center gap-1 text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                className={`flex items-center gap-1 transition-colors ${
+                  votedTypes.has(type.name)
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-red-500'
+                }`}
+                disabled={votedTypes.has(type.name)}
+                whileTap={{ scale: votedTypes.has(type.name) ? 1 : 0.95 }}
               >
-                <span className="text-lg">👎</span>
-                <span className="text-sm">{meditationFeedback[type.name].dislikes}</span>
-              </button>
+                👎
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={meditationFeedback[type.name]?.dislikes || 0}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="text-sm"
+                  >
+                    {meditationFeedback[type.name]?.dislikes ?? 0}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.button>
             </div>
           </div>
         ))}
