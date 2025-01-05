@@ -331,17 +331,29 @@ export default function MeditationTimer() {
     }
 
     try {
+      console.log('Submitting feedback:', { typeName, isLike });
       const response = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ typeName, isLike })
       });
       
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Feedback submission failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(`Failed to submit feedback: ${response.status} ${response.statusText}`);
+      }
+      
       const data = await response.json();
+      console.log('Feedback response:', data);
       
       if (!isValidFeedbackData(data)) {
         console.error('Invalid feedback data received:', data);
-        return setMeditationFeedback(createInitialFeedback());
+        throw new Error('Invalid feedback data received from server');
       }
 
       // Update feedback state
@@ -356,7 +368,7 @@ export default function MeditationTimer() {
       toast.success('Thank you for your feedback!');
     } catch (error) {
       console.error('Failed to update feedback:', error);
-      toast.error('Failed to submit feedback. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to submit feedback. Please try again.');
     }
   };
 
