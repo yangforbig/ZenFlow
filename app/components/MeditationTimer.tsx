@@ -334,18 +334,26 @@ export default function MeditationTimer() {
       console.log('Submitting feedback:', { typeName, isLike });
       const response = await fetch('/api/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ typeName, isLike })
       });
       
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server response was not JSON');
+      }
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json();
         console.error('Feedback submission failed:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData
         });
-        throw new Error(`Failed to submit feedback: ${response.status} ${response.statusText}`);
+        throw new Error(errorData.details || `Failed to submit feedback: ${response.status} ${response.statusText}`);
       }
       
       const data = await response.json();
