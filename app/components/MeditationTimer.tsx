@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { FeedbackDocument } from '@/types/feedback';
 
 const MEDITATION_TIMES = [
   { label: '5 mins', seconds: 300 },
@@ -17,14 +18,17 @@ const MEDITATION_TYPES = [
   { name: 'Mindfulness', description: 'Present moment awareness', icon: '🍃', sound: '/sounds/ambient-mindfulness.mp3' },
 ];
 
-const STORAGE_KEY = 'zenflow_meditation_feedback';
-
 const createInitialFeedback = () => {
   const feedback: {[key: string]: {likes: number, dislikes: number}} = {};
   MEDITATION_TYPES.forEach(type => {
     feedback[type.name] = { likes: 0, dislikes: 0 };
   });
   return feedback;
+};
+
+// Define a type for the feedback state
+type FeedbackState = {
+  [key: string]: { likes: number; dislikes: number };
 };
 
 export default function MeditationTimer() {
@@ -57,9 +61,9 @@ export default function MeditationTimer() {
         audioRef.current = null;
       }
     };
-  }, []);
+  }, [selectedType.sound]);
 
-  const fadeIn = () => {
+  const fadeIn = useCallback(() => {
     if (!audioRef.current) return;
     
     audioRef.current.volume = 0;
@@ -76,7 +80,7 @@ export default function MeditationTimer() {
         if (fadeInterval.current) clearInterval(fadeInterval.current);
       }
     }, 100);
-  };
+  }, [volume]);
 
   const fadeOut = () => {
     return new Promise<void>((resolve) => {
@@ -110,7 +114,7 @@ export default function MeditationTimer() {
     if (audioRef.current && volume > 0) {
       fadeIn();
     }
-  }, [mounted, volume]);
+  }, [mounted, volume, fadeIn]);
 
   const stopMeditation = useCallback(async () => {
     if (!mounted) return;
@@ -178,7 +182,6 @@ export default function MeditationTimer() {
       interval = setInterval(() => {
         setTimeLeft((time) => {
           if (time <= 1) {
-            // Stop meditation when time is up
             stopMeditation();
             return 0;
           }
@@ -192,16 +195,31 @@ export default function MeditationTimer() {
         clearInterval(interval);
       }
     };
-  }, [isActive, timeLeft]);
+  }, [isActive, timeLeft, stopMeditation]);
 
   // Load global feedback on mount
   useEffect(() => {
     fetch('/api/feedback')
       .then(res => res.json())
-      .then(data => {
-        const feedbackData = Object.fromEntries(
-          Object.entries(data).filter(([key]) => key !== '_id')
-        );
+      .then((data: FeedbackDocument) => {
+        const feedbackData: FeedbackState = {
+          'Breathing': { 
+            likes: data.Breathing.likes, 
+            dislikes: data.Breathing.dislikes 
+          },
+          'Body Scan': { 
+            likes: data['Body Scan'].likes, 
+            dislikes: data['Body Scan'].dislikes 
+          },
+          'Loving-Kindness': { 
+            likes: data['Loving-Kindness'].likes, 
+            dislikes: data['Loving-Kindness'].dislikes 
+          },
+          'Mindfulness': { 
+            likes: data.Mindfulness.likes, 
+            dislikes: data.Mindfulness.dislikes 
+          }
+        };
         setMeditationFeedback(feedbackData);
       })
       .catch(console.error);
@@ -215,10 +233,25 @@ export default function MeditationTimer() {
         body: JSON.stringify({ typeName, isLike })
       });
       
-      const data = await response.json();
-      const feedbackData = Object.fromEntries(
-        Object.entries(data).filter(([key]) => key !== '_id')
-      );
+      const data: FeedbackDocument = await response.json();
+      const feedbackData: FeedbackState = {
+        'Breathing': { 
+          likes: data.Breathing.likes, 
+          dislikes: data.Breathing.dislikes 
+        },
+        'Body Scan': { 
+          likes: data['Body Scan'].likes, 
+          dislikes: data['Body Scan'].dislikes 
+        },
+        'Loving-Kindness': { 
+          likes: data['Loving-Kindness'].likes, 
+          dislikes: data['Loving-Kindness'].dislikes 
+        },
+        'Mindfulness': { 
+          likes: data.Mindfulness.likes, 
+          dislikes: data.Mindfulness.dislikes 
+        }
+      };
       setMeditationFeedback(feedbackData);
     } catch (error) {
       console.error('Failed to update feedback:', error);

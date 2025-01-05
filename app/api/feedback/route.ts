@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
+import type { FeedbackDocument } from '@/types/feedback';
 
 export async function GET() {
   try {
     const client = await clientPromise;
     const db = client.db("zenflow");
-    const feedback = await db.collection("feedback").findOne({ _id: "global" });
+    const feedback = await db.collection<FeedbackDocument>("feedback").findOne(
+      { _id: 'feedback_stats' }
+    );
     
     if (!feedback) {
       return NextResponse.json(createInitialFeedback());
@@ -28,13 +31,15 @@ export async function POST(request: Request) {
       ? { [`${typeName}.likes`]: 1 }
       : { [`${typeName}.dislikes`]: 1 };
     
-    await db.collection("feedback").updateOne(
-      { _id: "global" },
+    await db.collection<FeedbackDocument>("feedback").updateOne(
+      { _id: 'feedback_stats' },
       { $inc: update },
       { upsert: true }
     );
     
-    const updatedFeedback = await db.collection("feedback").findOne({ _id: "global" });
+    const updatedFeedback = await db.collection<FeedbackDocument>("feedback").findOne(
+      { _id: 'feedback_stats' }
+    );
     return NextResponse.json(updatedFeedback || createInitialFeedback());
   } catch (e) {
     console.error('Database error:', e);
@@ -42,10 +47,12 @@ export async function POST(request: Request) {
   }
 }
 
-function createInitialFeedback() {
-  const feedback: {[key: string]: {likes: number, dislikes: number}} = {};
-  ['Breathing', 'Body Scan', 'Loving-Kindness', 'Mindfulness'].forEach(type => {
-    feedback[type] = { likes: 0, dislikes: 0 };
-  });
-  return { _id: "global", ...feedback };
+function createInitialFeedback(): FeedbackDocument {
+  return {
+    _id: 'feedback_stats',
+    Breathing: { name: 'Breathing', likes: 0, dislikes: 0 },
+    'Body Scan': { name: 'Body Scan', likes: 0, dislikes: 0 },
+    'Loving-Kindness': { name: 'Loving-Kindness', likes: 0, dislikes: 0 },
+    Mindfulness: { name: 'Mindfulness', likes: 0, dislikes: 0 }
+  };
 } 
