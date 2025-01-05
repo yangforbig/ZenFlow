@@ -13,33 +13,37 @@ const MEDITATION_TIMES = [
   { label: 'Custom', seconds: -1 },
 ];
 
-const MEDITATION_TYPES = [
+interface MeditationType {
+  name: keyof FeedbackDocument;
+  description: string;
+  icon: string;
+  sound: string;
+}
+
+const MEDITATION_TYPES: MeditationType[] = [
   { name: 'Breathing', description: 'Focus on your breath', icon: '🌬️', sound: '/sounds/ambient-breathing.mp3' },
   { name: 'Body Scan', description: 'Awareness of physical sensations', icon: '🧘‍♀️', sound: '/sounds/ambient-body-scan.mp3' },
   { name: 'Loving-Kindness', description: 'Cultivate compassion', icon: '💝', sound: '/sounds/ambient-loving-kindness.mp3' },
   { name: 'Mindfulness', description: 'Present moment awareness', icon: '🍃', sound: '/sounds/ambient-mindfulness.mp3' },
 ];
 
-const createInitialFeedback = () => {
-  const feedback: {[key: string]: {likes: number, dislikes: number}} = {};
-  MEDITATION_TYPES.forEach(type => {
-    feedback[type.name] = { likes: 0, dislikes: 0 };
-  });
-  return feedback;
-};
+const createInitialFeedback = (): FeedbackDocument => ({
+  Breathing: { likes: 0, dislikes: 0 },
+  'Body Scan': { likes: 0, dislikes: 0 },
+  'Loving-Kindness': { likes: 0, dislikes: 0 },
+  Mindfulness: { likes: 0, dislikes: 0 }
+});
 
-// Define a type for the feedback state
-type FeedbackState = {
-  [key: string]: { likes: number; dislikes: number };
-};
-
-// Add a validation function
-const isValidFeedbackData = (data: any): data is FeedbackDocument => {
-  return data 
-    && data.Breathing?.likes !== undefined
-    && data['Body Scan']?.likes !== undefined
-    && data['Loving-Kindness']?.likes !== undefined
-    && data.Mindfulness?.likes !== undefined;
+// Add proper type for data validation
+const isValidFeedbackData = (data: unknown): data is FeedbackDocument => {
+  if (!data || typeof data !== 'object') return false;
+  const feedbackData = data as Partial<FeedbackDocument>;
+  return Boolean(
+    feedbackData.Breathing?.likes !== undefined &&
+    feedbackData['Body Scan']?.likes !== undefined &&
+    feedbackData['Loving-Kindness']?.likes !== undefined &&
+    feedbackData.Mindfulness?.likes !== undefined
+  );
 };
 
 export default function MeditationTimer() {
@@ -47,16 +51,15 @@ export default function MeditationTimer() {
   const [isActive, setIsActive] = useState(false);
   const [selectedTime, setSelectedTime] = useState(MEDITATION_TIMES[0].seconds);
   const [timeLeft, setTimeLeft] = useState(MEDITATION_TIMES[0].seconds);
-  const [selectedType, setSelectedType] = useState(MEDITATION_TYPES[0]);
+  const [selectedType, setSelectedType] = useState<MeditationType>(MEDITATION_TYPES[0]);
   const [volume, setVolume] = useState(0.7);
   const [customMinutes, setCustomMinutes] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
-  const [meditationFeedback, setMeditationFeedback] = useState(createInitialFeedback);
+  const [meditationFeedback, setMeditationFeedback] = useState<FeedbackDocument>(createInitialFeedback());
   const [votedTypes, setVotedTypes] = useState<Set<string>>(new Set());
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeInterval = useRef<NodeJS.Timeout | null>(null);
-  const isAudioSwitching = useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -79,9 +82,11 @@ export default function MeditationTimer() {
       console.error('Error setting up audio:', error);
     }
 
+    const currentFadeInterval = fadeInterval.current;
+    
     return () => {
-      if (fadeInterval.current) {
-        clearInterval(fadeInterval.current);
+      if (currentFadeInterval) {
+        clearInterval(currentFadeInterval);
       }
       if (audioRef.current) {
         try {
@@ -93,7 +98,7 @@ export default function MeditationTimer() {
         }
       }
     };
-  }, [selectedType.sound]);
+  }, [selectedType.sound, mounted]);
 
   const fadeIn = useCallback(() => {
     if (!audioRef.current) return;
@@ -113,7 +118,7 @@ export default function MeditationTimer() {
     }, 50);
   }, [volume]);
 
-  const fadeOut = () => {
+  const fadeOut = useCallback(() => {
     return new Promise<void>((resolve) => {
       if (!audioRef.current) {
         resolve();
@@ -133,7 +138,7 @@ export default function MeditationTimer() {
         }
       }, 50);
     });
-  };
+  }, []);
 
   const startMeditation = useCallback(() => {
     if (!mounted || !audioRef.current) return;
@@ -287,14 +292,14 @@ export default function MeditationTimer() {
   useEffect(() => {
     fetch('/api/feedback')
       .then(res => res.json())
-      .then((data: any) => {
+      .then((data: unknown) => {
         if (!isValidFeedbackData(data)) {
           console.error('Invalid feedback data received:', data);
           return setMeditationFeedback(createInitialFeedback());
         }
 
-        const feedbackData: FeedbackState = {
-          'Breathing': { 
+        const feedbackData: FeedbackDocument = {
+          Breathing: { 
             likes: data.Breathing.likes || 0, 
             dislikes: data.Breathing.dislikes || 0 
           },
@@ -306,7 +311,7 @@ export default function MeditationTimer() {
             likes: data['Loving-Kindness'].likes || 0, 
             dislikes: data['Loving-Kindness'].dislikes || 0 
           },
-          'Mindfulness': { 
+          Mindfulness: { 
             likes: data.Mindfulness.likes || 0, 
             dislikes: data.Mindfulness.dislikes || 0 
           }
@@ -320,9 +325,8 @@ export default function MeditationTimer() {
   }, []);
 
   const handleFeedback = async (typeName: string, isLike: boolean) => {
-    // Check if user has already voted for this type
     if (votedTypes.has(typeName)) {
-      toast.info('You have already voted for this meditation type!');
+      toast.error('You have already voted for this meditation type!');
       return;
     }
 
@@ -367,6 +371,10 @@ export default function MeditationTimer() {
       setVotedTypes(new Set(JSON.parse(savedVotes)));
     }
   }, []);
+
+  const getFeedbackCounts = (type: keyof FeedbackDocument) => {
+    return meditationFeedback[type];
+  };
 
   if (!mounted) {
     return (
@@ -418,13 +426,13 @@ export default function MeditationTimer() {
                 👍
                 <AnimatePresence mode="wait">
                   <motion.span
-                    key={meditationFeedback[type.name]?.likes || 0}
+                    key={getFeedbackCounts(type.name).likes}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     className="text-sm"
                   >
-                    {meditationFeedback[type.name]?.likes ?? 0}
+                    {getFeedbackCounts(type.name).likes}
                   </motion.span>
                 </AnimatePresence>
               </motion.button>
@@ -442,13 +450,13 @@ export default function MeditationTimer() {
                 👎
                 <AnimatePresence mode="wait">
                   <motion.span
-                    key={meditationFeedback[type.name]?.dislikes || 0}
+                    key={getFeedbackCounts(type.name).dislikes}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     className="text-sm"
                   >
-                    {meditationFeedback[type.name]?.dislikes ?? 0}
+                    {getFeedbackCounts(type.name).dislikes}
                   </motion.span>
                 </AnimatePresence>
               </motion.button>

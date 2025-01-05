@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import type { FeedbackDocument } from '@/types/feedback';
-import { ObjectId } from 'mongodb';
+import { Document } from 'mongodb';
+
+interface FeedbackStats extends Document {
+  _id: string;
+  Breathing: { likes: number; dislikes: number };
+  'Body Scan': { likes: number; dislikes: number };
+  'Loving-Kindness': { likes: number; dislikes: number };
+  Mindfulness: { likes: number; dislikes: number };
+}
 
 const INITIAL_FEEDBACK = {
   Breathing: { likes: 0, dislikes: 0 },
@@ -15,25 +22,25 @@ export async function GET() {
     const client = await clientPromise;
     const db = client.db("zenflow");
     
-    // Find existing feedback
-    const feedback = await db.collection("feedback").findOne(
-      { _id: 'feedback_stats' }
+    const feedback = await db.collection<FeedbackStats>("feedback").findOne(
+      { _id: 'feedback_stats' } as Partial<FeedbackStats>
     );
     
-    console.log('GET Feedback:', feedback);
-    
     if (!feedback) {
-      // Create initial feedback if none exists
-      await db.collection("feedback").insertOne({
+      await db.collection<FeedbackStats>("feedback").insertOne({
         _id: 'feedback_stats',
         ...INITIAL_FEEDBACK
-      });
+      } as FeedbackStats);
       return NextResponse.json(INITIAL_FEEDBACK);
     }
     
-    // Remove _id from response
-    const { _id, ...feedbackData } = feedback;
-    return NextResponse.json(feedbackData);
+    // Return feedback data without _id
+    return NextResponse.json({
+      Breathing: feedback.Breathing,
+      'Body Scan': feedback['Body Scan'],
+      'Loving-Kindness': feedback['Loving-Kindness'],
+      Mindfulness: feedback.Mindfulness
+    });
   } catch (e) {
     console.error('Database error:', e);
     return NextResponse.json(INITIAL_FEEDBACK);
@@ -49,8 +56,8 @@ export async function POST(request: Request) {
     const db = client.db("zenflow");
     
     // Ensure document exists
-    await db.collection("feedback").updateOne(
-      { _id: 'feedback_stats' },
+    await db.collection<FeedbackStats>("feedback").updateOne(
+      { _id: 'feedback_stats' } as Partial<FeedbackStats>,
       { 
         $setOnInsert: INITIAL_FEEDBACK
       },
@@ -59,23 +66,27 @@ export async function POST(request: Request) {
 
     // Update the feedback count
     const updateField = isLike ? 'likes' : 'dislikes';
-    await db.collection("feedback").updateOne(
-      { _id: 'feedback_stats' },
+    await db.collection<FeedbackStats>("feedback").updateOne(
+      { _id: 'feedback_stats' } as Partial<FeedbackStats>,
       { $inc: { [`${typeName}.${updateField}`]: 1 } }
     );
     
     // Get updated feedback
-    const updatedFeedback = await db.collection("feedback").findOne(
-      { _id: 'feedback_stats' }
+    const updatedFeedback = await db.collection<FeedbackStats>("feedback").findOne(
+      { _id: 'feedback_stats' } as Partial<FeedbackStats>
     );
     
     if (!updatedFeedback) {
       return NextResponse.json(INITIAL_FEEDBACK);
     }
     
-    // Remove _id from response
-    const { _id, ...feedbackData } = updatedFeedback;
-    return NextResponse.json(feedbackData);
+    // Return feedback data without _id
+    return NextResponse.json({
+      Breathing: updatedFeedback.Breathing,
+      'Body Scan': updatedFeedback['Body Scan'],
+      'Loving-Kindness': updatedFeedback['Loving-Kindness'],
+      Mindfulness: updatedFeedback.Mindfulness
+    });
   } catch (e) {
     console.error('Database error:', e);
     return NextResponse.json(INITIAL_FEEDBACK);
