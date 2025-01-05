@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { Document, MongoClient } from 'mongodb';
+import { Document } from 'mongodb';
 
 interface FeedbackStats extends Document {
   _id: string;
@@ -19,13 +19,7 @@ const INITIAL_FEEDBACK = {
 
 export async function GET() {
   try {
-    const client = await Promise.race([
-      clientPromise,
-      new Promise<MongoClient>((_, reject) => 
-        setTimeout(() => reject(new Error('MongoDB connection timeout')), 10000)
-      )
-    ]);
-
+    const client = await clientPromise;
     const db = client.db("zenflow");
     
     const feedback = await db.collection<FeedbackStats>("feedback").findOne(
@@ -61,82 +55,31 @@ export async function POST(request: Request) {
     const { typeName, isLike } = await request.json();
     console.log('Updating feedback for:', typeName, 'isLike:', isLike);
     
-    const client = await Promise.race([
-      clientPromise,
-      new Promise<MongoClient>((_, reject) => 
-        setTimeout(() => reject(new Error('MongoDB connection timeout')), 10000)
-      )
-    ]);
-
+    const client = await clientPromise;
     const db = client.db("zenflow");
-    console.log('Connected to database:', db.databaseName);
     
-    // Ensure document exists with timeout
-    try {
-      await Promise.race([
-        db.collection<FeedbackStats>("feedback").updateOne(
-          { _id: 'feedback_stats' } as Partial<FeedbackStats>,
-          { 
-            $setOnInsert: INITIAL_FEEDBACK
-          },
-          { upsert: true }
-        ),
-        new Promise<void>((_, reject) => 
-          setTimeout(() => reject(new Error('Document creation timeout')), 5000)
-        )
-      ]);
-      console.log('Document existence ensured');
-    } catch (error) {
-      console.error('Error ensuring document exists:', error);
-      throw error;
-    }
-
-    // Update the feedback count with timeout
+    // Update feedback count and get the updated document in a single operation
     const updateField = isLike ? 'likes' : 'dislikes';
-    try {
-      await Promise.race([
-        db.collection<FeedbackStats>("feedback").updateOne(
-          { _id: 'feedback_stats' } as Partial<FeedbackStats>,
-          { $inc: { [`${typeName}.${updateField}`]: 1 } }
-        ),
-        new Promise<void>((_, reject) => 
-          setTimeout(() => reject(new Error('Update operation timeout')), 5000)
-        )
-      ]);
-      console.log('Feedback count updated');
-    } catch (error) {
-      console.error('Error updating feedback count:', error);
-      throw error;
-    }
-    
-    // Get updated feedback with timeout
-    let updatedFeedback;
-    try {
-      updatedFeedback = await Promise.race([
-        db.collection<FeedbackStats>("feedback").findOne(
-          { _id: 'feedback_stats' } as Partial<FeedbackStats>
-        ),
-        new Promise<FeedbackStats | null>((_, reject) => 
-          setTimeout(() => reject(new Error('Fetch operation timeout')), 5000)
-        )
-      ]);
-      console.log('Retrieved updated feedback');
-    } catch (error) {
-      console.error('Error retrieving updated feedback:', error);
-      throw error;
-    }
-    
-    if (!updatedFeedback) {
-      console.log('No feedback document found, returning initial feedback');
-      return NextResponse.json(INITIAL_FEEDBACK);
-    }
-    
+    const result = await db.collection<FeedbackStats>("feedback").findOneAndUpdate(
+      { _id: 'feedback_stats' },
+      {
+        $inc: { [`${typeName}.${updateField}`]: 1 },
+        $setOnInsert: INITIAL_FEEDBACK
+      },
+      {
+        upsert: true,
+        returnDocument: 'after'
+      }
+    );
+
+    const updatedDoc = result?.value || INITIAL_FEEDBACK;
+
     // Return feedback data without _id
     const response = {
-      Breathing: updatedFeedback.Breathing,
-      'Body Scan': updatedFeedback['Body Scan'],
-      'Loving-Kindness': updatedFeedback['Loving-Kindness'],
-      Mindfulness: updatedFeedback.Mindfulness
+      Breathing: updatedDoc.Breathing,
+      'Body Scan': updatedDoc['Body Scan'],
+      'Loving-Kindness': updatedDoc['Loving-Kindness'],
+      Mindfulness: updatedDoc.Mindfulness
     };
     console.log('Sending response:', response);
     return NextResponse.json(response);
