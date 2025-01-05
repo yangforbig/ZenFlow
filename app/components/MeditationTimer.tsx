@@ -425,53 +425,63 @@ export default function MeditationTimer() {
             
             {/* Feedback Section */}
             <div className="flex justify-center gap-4 mt-2">
-              <motion.button
-                onClick={() => handleFeedback(type.name, true)}
-                className={`flex items-center gap-1 transition-colors ${
-                  votedTypes.has(type.name)
-                    ? 'text-gray-400 cursor-not-allowed'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-green-500'
-                }`}
-                disabled={votedTypes.has(type.name)}
-                whileTap={{ scale: votedTypes.has(type.name) ? 1 : 0.95 }}
-              >
-                👍
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={getFeedbackCounts(type.name).likes}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="text-sm"
-                  >
-                    {getFeedbackCounts(type.name).likes}
-                  </motion.span>
-                </AnimatePresence>
-              </motion.button>
+              <div className="relative group">
+                <motion.button
+                  onClick={() => handleFeedback(type.name, true)}
+                  className={`flex items-center gap-1 transition-colors ${
+                    votedTypes.has(type.name)
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-green-500'
+                  }`}
+                  disabled={votedTypes.has(type.name)}
+                  whileTap={{ scale: votedTypes.has(type.name) ? 1 : 0.95 }}
+                >
+                  👍
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={getFeedbackCounts(type.name).likes}
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="text-sm"
+                    >
+                      {getFeedbackCounts(type.name).likes}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.button>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                  You can only give 1 feedback per type
+                </div>
+              </div>
               
-              <motion.button
-                onClick={() => handleFeedback(type.name, false)}
-                className={`flex items-center gap-1 transition-colors ${
-                  votedTypes.has(type.name)
-                    ? 'text-gray-400 cursor-not-allowed'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-red-500'
-                }`}
-                disabled={votedTypes.has(type.name)}
-                whileTap={{ scale: votedTypes.has(type.name) ? 1 : 0.95 }}
-              >
-                👎
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={getFeedbackCounts(type.name).dislikes}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="text-sm"
-                  >
-                    {getFeedbackCounts(type.name).dislikes}
-                  </motion.span>
-                </AnimatePresence>
-              </motion.button>
+              <div className="relative group">
+                <motion.button
+                  onClick={() => handleFeedback(type.name, false)}
+                  className={`flex items-center gap-1 transition-colors ${
+                    votedTypes.has(type.name)
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-red-500'
+                  }`}
+                  disabled={votedTypes.has(type.name)}
+                  whileTap={{ scale: votedTypes.has(type.name) ? 1 : 0.95 }}
+                >
+                  👎
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={getFeedbackCounts(type.name).dislikes}
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="text-sm"
+                    >
+                      {getFeedbackCounts(type.name).dislikes}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.button>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                  You can only give 1 feedback per type
+                </div>
+              </div>
             </div>
           </div>
         ))}

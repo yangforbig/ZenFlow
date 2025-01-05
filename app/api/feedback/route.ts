@@ -58,18 +58,25 @@ export async function POST(request: Request) {
     const client = await clientPromise;
     const db = client.db("zenflow");
     
-    // Update feedback count and get the updated document in a single operation
+    // First, ensure the document exists
+    const existingDoc = await db.collection<FeedbackStats>("feedback").findOne(
+      { _id: 'feedback_stats' }
+    );
+
+    if (!existingDoc) {
+      // If document doesn't exist, create it first
+      await db.collection<FeedbackStats>("feedback").insertOne({
+        _id: 'feedback_stats',
+        ...INITIAL_FEEDBACK
+      } as FeedbackStats);
+    }
+
+    // Now update the feedback count
     const updateField = isLike ? 'likes' : 'dislikes';
     const result = await db.collection<FeedbackStats>("feedback").findOneAndUpdate(
       { _id: 'feedback_stats' },
-      {
-        $inc: { [`${typeName}.${updateField}`]: 1 },
-        $setOnInsert: INITIAL_FEEDBACK
-      },
-      {
-        upsert: true,
-        returnDocument: 'after'
-      }
+      { $inc: { [`${typeName}.${updateField}`]: 1 } },
+      { returnDocument: 'after' }
     );
 
     const updatedDoc = result?.value || INITIAL_FEEDBACK;
