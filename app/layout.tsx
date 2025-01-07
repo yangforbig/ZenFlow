@@ -1,9 +1,23 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Quicksand, Caveat, Qwitcher_Grypen } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'react-hot-toast';
 
-const inter = Inter({ subsets: ["latin"] });
+const quicksand = Quicksand({
+  subsets: ['latin'],
+  variable: '--font-quicksand',
+});
+
+const caveat = Caveat({
+  subsets: ['latin'],
+  variable: '--font-caveat',
+});
+
+const qwitcherGrypen = Qwitcher_Grypen({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-qwitcher',
+});
 
 export const metadata: Metadata = {
   title: "ZenFlow",
@@ -17,7 +31,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`font-quicksand ${quicksand.variable} ${caveat.variable} ${qwitcherGrypen.variable}`}>
         {children}
         <Toaster position="bottom-center" />
       </body>

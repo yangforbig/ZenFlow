@@ -409,7 +409,7 @@ export default function MeditationTimer() {
 
   return (
     <>
-      <h1 className="text-4xl font-bold mb-2 text-gray-800 dark:text-white">ZenFlow</h1>
+      <h1 className="text-4xl font-quicksand font-bold mb-2 text-gray-800 dark:text-white">ZenFlow</h1>
       <p className="text-gray-600 dark:text-gray-300 mb-8">Find your perfect state of flow</p>
 
       {/* Meditation Types */}
@@ -596,30 +596,56 @@ export default function MeditationTimer() {
       </div>
 
       {/* Control Buttons */}
-      <div className="flex gap-4">
-        <button
-          className={`rounded-full px-8 py-4 text-white transition-all duration-300 ${
-            isActive
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-blue-500 hover:bg-blue-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-          }`}
-          onClick={startMeditation}
-          disabled={isActive}
-        >
-          Begin Journey
-        </button>
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex gap-4">
+          <button
+            className={`rounded-full px-8 py-4 text-white transition-all duration-300 ${
+              isActive
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-500 hover:bg-blue-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+            }`}
+            onClick={startMeditation}
+            disabled={isActive}
+          >
+            Begin
+          </button>
+
+          <button
+            className="rounded-full px-8 py-4 text-white transition-all duration-300 bg-sky-400 hover:bg-sky-500 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+            onClick={() => {
+              setTimeLeft(selectedTime);
+              if (isActive) {
+                stopMeditation();
+              }
+            }}
+          >
+            Reset
+          </button>
+
+          <button
+            className={`rounded-full px-8 py-4 text-white transition-all duration-300 ${
+              !isActive
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-red-400 hover:bg-red-500 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+            }`}
+            onClick={stopMeditation}
+            disabled={!isActive}
+          >
+            End
+          </button>
+        </div>
         
-        <button
-          className={`rounded-full px-8 py-4 text-white transition-all duration-300 ${
-            !isActive
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-red-400 hover:bg-red-500 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
-          }`}
-          onClick={stopMeditation}
-          disabled={!isActive}
-        >
-          End Session
-        </button>
+        <div className="flex items-baseline gap-2 text-gray-600 dark:text-gray-400">
+          <span className="font-caveat">by</span>
+          <a 
+            href="https://x.com/nomapoet" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="font-qwitcher text-3xl hover:text-blue-500 transition-colors"
+          >
+            Noma
+          </a>
+        </div>
       </div>
     </>
   );

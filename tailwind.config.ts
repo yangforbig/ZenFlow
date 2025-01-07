@@ -12,6 +12,11 @@ export default {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        'quicksand': ['var(--font-quicksand)'],
+        'caveat': ['var(--font-caveat)'],
+        'qwitcher': ['var(--font-qwitcher)'],
+      },
     },
   },
   plugins: [],
