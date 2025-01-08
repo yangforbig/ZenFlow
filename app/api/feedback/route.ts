@@ -1,8 +1,25 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import type { FeedbackStats, VoteRecord } from '@/types/feedback';
-import { headers } from 'next/headers';
-import UAParser from 'ua-parser-js';
+import { FeedbackStats, VoteRecord, INITIAL_FEEDBACK, DeviceInfo, GeoLocation } from '@/types/feedback';
+import * as UAParser from 'ua-parser-js';
+
+async function getGeoData(ip: string): Promise<GeoLocation> {
+  try {
+    const response = await fetch(`http://ip-api.com/json/${ip}`);
+    const data = await response.json();
+    return {
+      country: data.country,
+      region: data.regionName,
+      city: data.city,
+      timezone: data.timezone,
+      latitude: data.lat,
+      longitude: data.lon
+    };
+  } catch (error) {
+    console.error('Failed to fetch geo data:', error);
+    return {};
+  }
+}
 
 export async function GET() {
   try {
@@ -43,32 +60,51 @@ export async function POST(request: Request) {
     const client = await clientPromise;
     const db = client.db("zenflow");
     
-    const headersList = headers();
-    const userIP = headersList.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
-    const userAgent = headersList.get('user-agent');
-    const timezone = headersList.get('accept-timezone');
+    const userIP = request.headers.get('x-forwarded-for')?.split(',')[0] || 
+                   request.headers.get('x-real-ip') || 
+                   'unknown';
+    const userAgent = request.headers.get('user-agent');
+    const referrer = request.headers.get('referer');
+    const language = request.headers.get('accept-language');
+    const viewportWidth = request.headers.get('sec-ch-viewport-width');
 
     // Parse user agent for device information
-    const uaParser = new UAParser(userAgent || '');
-    const device = {
-      type: uaParser.getDevice().type || 'unknown',
-      browser: uaParser.getBrowser().name || 'unknown',
-      os: uaParser.getOS().name || 'unknown'
+    const parser = new UAParser.UAParser(userAgent || '');
+    const device: DeviceInfo = {
+      type: parser.getDevice().type || 'desktop',
+      browser: parser.getBrowser().name || 'unknown',
+      os: parser.getOS().name || 'unknown',
+      language: language?.split(',')[0],
+      screenSize: viewportWidth || undefined
     };
+
+    // Get geo location data
+    const geo = await getGeoData(userIP);
+
+    // Get existing user data or create new
+    const existingUser = await db.collection<VoteRecord>("votes").findOne({ userIP });
+    const firstVisit = existingUser ? existingUser.firstVisitAt : new Date();
+    const visitCount = existingUser ? existingUser.visitCount + 1 : 1;
 
     // Record the vote with enhanced metadata
     const voteRecord: VoteRecord = {
       userIP,
       meditationType: typeName,
       isLike,
-      timestamp: new Date(),
+      createdAt: new Date(),
+      lastModifiedAt: new Date(),
+      firstVisitAt: firstVisit,
       userAgent: userAgent || null,
-      timezone: timezone || null,
       device,
-      sessionData
+      geo,
+      referrer: referrer || undefined,
+      visitCount,
+      totalSessionTime: sessionData?.duration || 0,
+      sessionData,
+      preferredMeditationType: typeName // Will be updated based on usage patterns
     };
 
-    // Check if user has already voted
+    // Check if user has already voted for this type
     const existingVote = await db.collection<VoteRecord>("votes").findOne({
       userIP,
       meditationType: typeName
