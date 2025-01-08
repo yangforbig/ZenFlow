@@ -326,7 +326,14 @@ export default function MeditationTimer() {
 
   const handleFeedback = async (typeName: string, isLike: boolean) => {
     if (votedTypes.has(typeName)) {
-      toast.error('You have already voted for this meditation type!');
+      toast.error('You have already given feedback for this mood!', {
+        duration: 2000,
+        style: {
+          background: '#333',
+          color: '#fff',
+          borderRadius: '10px',
+        },
+      });
       return;
     }
 
@@ -341,23 +348,23 @@ export default function MeditationTimer() {
         body: JSON.stringify({ typeName, isLike })
       });
       
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Server response was not JSON');
-      }
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Feedback submission failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        });
-        throw new Error(errorData.details || `Failed to submit feedback: ${response.status} ${response.statusText}`);
+        if (response.status === 400 && errorData.error === 'Already voted for this type') {
+          toast.error('You have already given feedback for this mood!', {
+            duration: 2000,
+            style: {
+              background: '#333',
+              color: '#fff',
+              borderRadius: '10px',
+            },
+          });
+          return;
+        }
+        throw new Error(errorData.error || 'Failed to submit feedback');
       }
       
       const data = await response.json();
-      console.log('Feedback response:', data);
       
       if (!isValidFeedbackData(data)) {
         console.error('Invalid feedback data received:', data);
@@ -373,10 +380,17 @@ export default function MeditationTimer() {
       localStorage.setItem('votedTypes', JSON.stringify([...newVotedTypes]));
       
       // Show success message
-      toast.success('Thank you for your feedback!');
+      toast.success('Thank you for your feedback!', {
+        duration: 2000,
+        style: {
+          background: '#333',
+          color: '#fff',
+          borderRadius: '10px',
+        },
+      });
     } catch (error) {
       console.error('Failed to update feedback:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to submit feedback. Please try again.');
+      toast.error('Something went wrong. Please try again later.');
     }
   };
 
@@ -394,6 +408,37 @@ export default function MeditationTimer() {
 
   const getFeedbackCounts = (type: keyof FeedbackDocument) => {
     return meditationFeedback[type];
+  };
+
+  const clearVotes = async () => {
+    try {
+      const response = await fetch('/api/clear-votes', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to clear votes');
+      }
+
+      // Clear local state
+      setVotedTypes(new Set());
+      localStorage.removeItem('votedTypes');
+      
+      // Reset feedback counts
+      setMeditationFeedback(createInitialFeedback());
+      
+      toast.success('Vote history cleared successfully', {
+        duration: 2000,
+        style: {
+          background: '#333',
+          color: '#fff',
+          borderRadius: '10px',
+        },
+      });
+    } catch (error) {
+      console.error('Failed to clear votes:', error);
+      toast.error('Failed to clear vote history');
+    }
   };
 
   if (!mounted) {
@@ -458,7 +503,7 @@ export default function MeditationTimer() {
                   </AnimatePresence>
                 </motion.button>
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                  You can only give 1 feedback per type
+                  1 feedback per mood
                 </div>
               </div>
               
@@ -487,7 +532,7 @@ export default function MeditationTimer() {
                   </AnimatePresence>
                 </motion.button>
                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                  You can only give 1 feedback per type
+                  1 feedback per mood
                 </div>
               </div>
             </div>
@@ -647,6 +692,15 @@ export default function MeditationTimer() {
           </a>
         </div>
       </div>
+
+      {process.env.NODE_ENV === 'development' && (
+        <button 
+          onClick={clearVotes}
+          className="mt-4 text-sm text-gray-400 hover:text-gray-600"
+        >
+          Clear Vote History
+        </button>
+      )}
     </>
   );
 } 
