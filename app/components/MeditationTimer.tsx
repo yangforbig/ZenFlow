@@ -458,7 +458,7 @@ export default function MeditationTimer() {
       <p className="text-gray-600 dark:text-gray-300 mb-8">Find your perfect state of flow via <i>meditation</i></p>
 
       {/* Meditation Types */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full mb-6 sm:mb-10">
         {MEDITATION_TYPES.map((type) => (
           <div key={type.name} className="flex flex-col h-full">
             <button
@@ -469,9 +469,9 @@ export default function MeditationTimer() {
                   : 'bg-white/50 dark:bg-gray-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/50'
               }`}
             >
-              <span className="text-4xl mb-2">{type.icon}</span>
+              <span className="text-3xl sm:text-4xl mb-2">{type.icon}</span>
               <h3 className="font-semibold text-gray-800 dark:text-white">{type.name}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 text-center">
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 text-center">
                 {type.description}
               </p>
             </button>
@@ -541,24 +541,46 @@ export default function MeditationTimer() {
       </div>
 
       {/* Timer Display */}
-      <div className="relative w-80 h-80 mb-8">
+      <div className="relative w-64 h-64 sm:w-80 sm:h-80 mb-6 sm:mb-8">
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-7xl font-light text-gray-800 dark:text-white">
+          <div className="text-5xl sm:text-7xl font-light text-gray-800 dark:text-white">
             {formatTime(timeLeft)}
           </div>
         </div>
-        <svg className="transform -rotate-90 w-80 h-80">
+        <svg className="transform -rotate-90 w-64 h-64 sm:w-80 sm:h-80">
+          {/* Mobile circle */}
           <circle
-            className="text-gray-200 dark:text-gray-700"
+            strokeWidth="6"
+            stroke="currentColor"
+            fill="transparent"
+            r="96"
+            cx="128"
+            cy="128"
+            className="text-gray-200 dark:text-gray-700 sm:hidden"
+          />
+          <circle
+            strokeWidth="6"
+            strokeLinecap="round"
+            stroke="currentColor"
+            fill="transparent"
+            r="96"
+            cx="128"
+            cy="128"
+            strokeDasharray={603.2}
+            strokeDashoffset={603.2 * (1 - timeLeft / selectedTime)}
+            className="text-blue-500 dark:text-blue-400 sm:hidden"
+          />
+          {/* Desktop circle */}
+          <circle
             strokeWidth="6"
             stroke="currentColor"
             fill="transparent"
             r="120"
             cx="160"
             cy="160"
+            className="text-gray-200 dark:text-gray-700 hidden sm:block"
           />
           <circle
-            className="text-blue-500 dark:text-blue-400"
             strokeWidth="6"
             strokeLinecap="round"
             stroke="currentColor"
@@ -568,18 +590,19 @@ export default function MeditationTimer() {
             cy="160"
             strokeDasharray={754}
             strokeDashoffset={754 * (1 - timeLeft / selectedTime)}
+            className="text-blue-500 dark:text-blue-400 hidden sm:block"
           />
         </svg>
       </div>
 
       {/* Time Selection with Custom Input */}
-      <div className="flex flex-col items-center gap-4 mb-8">
-        <div className="flex flex-wrap justify-center gap-3">
+      <div className="flex flex-col items-center gap-4 mb-6 sm:mb-8">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
           {MEDITATION_TIMES.map((time) => (
             <button
               key={time.seconds}
               onClick={() => handleTimeSelection(time.seconds)}
-              className={`px-6 py-3 rounded-full text-sm transition-all duration-300 ${
+              className={`px-4 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-sm transition-all duration-300 ${
                 selectedTime === time.seconds && !showCustomInput
                   ? 'bg-blue-500 text-white shadow-lg scale-105'
                   : 'bg-white/70 dark:bg-gray-800/70 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800'
@@ -642,9 +665,9 @@ export default function MeditationTimer() {
 
       {/* Control Buttons */}
       <div className="flex flex-col items-center gap-4">
-        <div className="flex gap-4">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
           <button
-            className={`rounded-full px-8 py-4 text-white transition-all duration-300 ${
+            className={`rounded-full px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base text-white transition-all duration-300 ${
               isActive
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-blue-500 hover:bg-blue-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
@@ -656,7 +679,7 @@ export default function MeditationTimer() {
           </button>
 
           <button
-            className="rounded-full px-8 py-4 text-white transition-all duration-300 bg-sky-400 hover:bg-sky-500 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+            className="rounded-full px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base text-white transition-all duration-300 bg-sky-400 hover:bg-sky-500 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
             onClick={() => {
               setTimeLeft(selectedTime);
               if (isActive) {
@@ -668,7 +691,7 @@ export default function MeditationTimer() {
           </button>
 
           <button
-            className={`rounded-full px-8 py-4 text-white transition-all duration-300 ${
+            className={`rounded-full px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base text-white transition-all duration-300 ${
               !isActive
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-red-400 hover:bg-red-500 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
