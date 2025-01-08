@@ -455,7 +455,7 @@ export default function MeditationTimer() {
   return (
     <>
       <h1 className="text-4xl font-quicksand font-bold mb-2 text-gray-800 dark:text-white">ZenFlow</h1>
-      <p className="text-gray-600 dark:text-gray-300 mb-8">Find your perfect state of flow</p>
+      <p className="text-gray-600 dark:text-gray-300 mb-8">Find your perfect state of flow via <i>meditation</i></p>
 
       {/* Meditation Types */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-10">
@@ -688,7 +688,7 @@ export default function MeditationTimer() {
             rel="noopener noreferrer" 
             className="font-qwitcher text-3xl hover:text-blue-500 transition-colors"
           >
-            Noma
+            Noma<span className="text-base"> 👋</span>
           </a>
         </div>
       </div>
