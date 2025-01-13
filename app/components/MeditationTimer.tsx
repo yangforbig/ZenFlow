@@ -21,10 +21,10 @@ interface MeditationType {
 }
 
 const MEDITATION_TYPES: MeditationType[] = [
-  { name: 'Breathing', description: 'Focus on your breath', icon: '🌬️', sound: '/sounds/ambient-breathing.mp3' },
-  { name: 'Body Scan', description: 'Awareness of physical sensations', icon: '🧘‍♀️', sound: '/sounds/ambient-body-scan.mp3' },
-  { name: 'Loving-Kindness', description: 'Cultivate compassion', icon: '💝', sound: '/sounds/ambient-loving-kindness.mp3' },
-  { name: 'Mindfulness', description: 'Present moment awareness', icon: '🍃', sound: '/sounds/ambient-mindfulness.mp3' },
+  { name: 'Breathing', description: 'Focus on your breath', icon: '🌊', sound: '/sounds/ambient-breathing.mp3' },
+  { name: 'Body Scan', description: 'Awareness of physical sensations', icon: '🍃', sound: '/sounds/ambient-body-scan.mp3' },
+  { name: 'Loving-Kindness', description: 'Cultivate compassion', icon: '🎹', sound: '/sounds/ambient-loving-kindness.mp3' },
+  { name: 'Mindfulness', description: 'Present moment awareness', icon: '☔', sound: '/sounds/ambient-mindfulness.mp3' },
 ];
 
 const createInitialFeedback = (): FeedbackDocument => ({
@@ -49,6 +49,7 @@ const isValidFeedbackData = (data: unknown): data is FeedbackDocument => {
 export default function MeditationTimer() {
   const [mounted, setMounted] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [selectedTime, setSelectedTime] = useState(MEDITATION_TIMES[0].seconds);
   const [timeLeft, setTimeLeft] = useState(MEDITATION_TIMES[0].seconds);
   const [selectedType, setSelectedType] = useState<MeditationType>(MEDITATION_TYPES[0]);
@@ -57,6 +58,7 @@ export default function MeditationTimer() {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [meditationFeedback, setMeditationFeedback] = useState<FeedbackDocument>(createInitialFeedback());
   const [votedTypes, setVotedTypes] = useState<Set<string>>(new Set());
+  const [prepCountdown, setPrepCountdown] = useState<number | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fadeInterval = useRef<NodeJS.Timeout | null>(null);
@@ -143,18 +145,69 @@ export default function MeditationTimer() {
   const startMeditation = useCallback(() => {
     if (!mounted || !audioRef.current) return;
     
-    setIsActive(true);
-    if (volume > 0) {
-      audioRef.current.play().then(() => {
-        fadeIn();
-      }).catch(error => {
-        console.error('Error starting meditation:', error);
-      });
+    if (isPaused) {
+      // Resume from pause
+      setIsPaused(false);
+      setIsActive(true);
+      if (volume > 0) {
+        audioRef.current.play().then(() => {
+          fadeIn();
+        }).catch(error => {
+          console.error('Error resuming meditation:', error);
+        });
+      }
+      return;
     }
-  }, [mounted, volume, fadeIn]);
+    
+    // Start preparation countdown
+    setPrepCountdown(3);
+    
+    // Handle the countdown
+    const countdownInterval = setInterval(() => {
+      setPrepCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(countdownInterval);
+          // Actually start the meditation after countdown
+          setIsActive(true);
+          if (volume > 0) {
+            audioRef.current?.play().then(() => {
+              fadeIn();
+            }).catch(error => {
+              console.error('Error starting meditation:', error);
+            });
+          }
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [mounted, volume, fadeIn, isPaused]);
+
+  const pauseMeditation = useCallback(async () => {
+    if (!mounted || !audioRef.current) return;
+    
+    setIsPaused(true);
+    setIsActive(false);
+    
+    try {
+      await fadeOut();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    } catch (error) {
+      console.error('Error pausing meditation:', error);
+      // Still pause even if fade fails
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    }
+  }, [mounted, fadeOut]);
 
   const stopMeditation = useCallback(async () => {
     if (!mounted) return;
+    
+    // Clear preparation countdown if it's running
+    setPrepCountdown(null);
     
     // Force stop immediately if there's no audio
     if (!audioRef.current) {
@@ -543,9 +596,21 @@ export default function MeditationTimer() {
       {/* Timer Display */}
       <div className="relative w-64 h-64 sm:w-80 sm:h-80 mb-6 sm:mb-8">
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-5xl sm:text-7xl font-light text-gray-800 dark:text-white">
-            {formatTime(timeLeft)}
-          </div>
+          {prepCountdown !== null ? (
+            <motion.div
+              key={prepCountdown}
+              initial={{ scale: 1.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              className="text-7xl sm:text-8xl font-light text-blue-500 dark:text-blue-400"
+            >
+              {prepCountdown}
+            </motion.div>
+          ) : (
+            <div className="text-5xl sm:text-7xl font-light text-gray-800 dark:text-white">
+              {formatTime(timeLeft)}
+            </div>
+          )}
         </div>
         <svg className="transform -rotate-90 w-64 h-64 sm:w-80 sm:h-80">
           {/* Mobile circle */}
@@ -668,20 +733,23 @@ export default function MeditationTimer() {
         <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
           <button
             className={`rounded-full px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base text-white transition-all duration-300 ${
-              isActive
+              prepCountdown !== null
                 ? 'bg-gray-400 cursor-not-allowed'
+                : isActive || isPaused
+                ? 'bg-yellow-500 hover:bg-yellow-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
                 : 'bg-blue-500 hover:bg-blue-600 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
             }`}
-            onClick={startMeditation}
-            disabled={isActive}
+            onClick={isActive ? pauseMeditation : startMeditation}
+            disabled={prepCountdown !== null}
           >
-            Begin
+            {isActive ? 'Pause' : isPaused ? 'Resume' : 'Begin'}
           </button>
 
           <button
             className="rounded-full px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base text-white transition-all duration-300 bg-sky-400 hover:bg-sky-500 shadow-lg hover:shadow-xl hover:-translate-y-0.5"
             onClick={() => {
               setTimeLeft(selectedTime);
+              setIsPaused(false);
               if (isActive) {
                 stopMeditation();
               }
@@ -692,12 +760,15 @@ export default function MeditationTimer() {
 
           <button
             className={`rounded-full px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base text-white transition-all duration-300 ${
-              !isActive
+              !isActive && !isPaused && prepCountdown === null
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-red-400 hover:bg-red-500 shadow-lg hover:shadow-xl hover:-translate-y-0.5'
             }`}
-            onClick={stopMeditation}
-            disabled={!isActive}
+            onClick={() => {
+              stopMeditation();
+              setIsPaused(false);
+            }}
+            disabled={!isActive && !isPaused && prepCountdown === null}
           >
             End
           </button>
