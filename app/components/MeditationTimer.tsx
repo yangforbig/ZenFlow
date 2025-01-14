@@ -508,7 +508,7 @@ export default function MeditationTimer() {
   return (
     <>
       <h1 className="text-4xl font-quicksand font-bold mb-2 text-gray-800 dark:text-white">ZenFlow</h1>
-      <p className="text-gray-600 dark:text-gray-300 mb-8">Find your perfect state of flow via <i>meditation</i></p>
+      <p className="text-gray-600 dark:text-gray-300 mb-8">Find your perfect state of flow</p>
 
       {/* Meditation Types */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full mb-6 sm:mb-10">
@@ -776,14 +776,19 @@ export default function MeditationTimer() {
         
         <div className="flex items-baseline gap-2 text-gray-600 dark:text-gray-400">
           <span className="font-caveat">by</span>
-          <a 
-            href="https://x.com/nomapoet" 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="font-qwitcher text-3xl hover:text-blue-500 transition-colors"
-          >
-            Noma<span className="text-base"> 👋</span>
-          </a>
+          <div className="relative group">
+            <a 
+              href="https://x.com/nomapoet" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="font-qwitcher text-3xl hover:text-blue-500 transition-colors"
+            >
+              Noma<span className="text-base"> 👋</span>
+            </a>
+            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+              Say Hi
+            </div>
+          </div>
         </div>
       </div>
 
