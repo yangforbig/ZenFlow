@@ -27,7 +27,7 @@ export default function Home() {
           </span>
         </Link>
         <p className="text-xl md:text-2xl mt-8 mb-8 text-gray-700 dark:text-gray-300">
-          Find your perfect state of flow
+          Find your perfect state of flow within 5 mins
         </p>
       </div>
       <div className="flex items-baseline gap-2 text-gray-600 dark:text-gray-400">

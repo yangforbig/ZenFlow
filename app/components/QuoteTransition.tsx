@@ -50,7 +50,7 @@ export default function QuoteTransition() {
         >
           <div>
             <h1 className="text-4xl font-quicksand font-bold mb-2 text-gray-800 dark:text-white">ZenFlow</h1>
-            <p className="text-gray-600 dark:text-gray-300">Find your perfect state of flow with 5 mins</p>
+            <p className="text-gray-600 dark:text-gray-300">Find your perfect state of flow</p>
           </div>
           
           <motion.div
