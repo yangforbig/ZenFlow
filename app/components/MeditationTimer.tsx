@@ -377,79 +377,27 @@ export default function MeditationTimer() {
       });
   }, []);
 
-  const handleFeedback = async (typeName: string, isLike: boolean) => {
-    if (votedTypes.has(typeName)) {
-      toast.error('You have already given feedback for this mood!', {
-        duration: 2000,
-        style: {
-          background: '#333',
-          color: '#fff',
-          borderRadius: '10px',
-        },
-      });
-      return;
-    }
-
+  const handleFeedback = async (typeName: keyof FeedbackDocument) => {
     try {
-      console.log('Submitting feedback:', { typeName, isLike });
+      const isLike = !meditationFeedback[typeName]?.likes || meditationFeedback[typeName].likes === 0;
       const response = await fetch('/api/feedback', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        body: JSON.stringify({ typeName, isLike })
+        body: JSON.stringify({ typeName, isLike }),
       });
-      
+
       if (!response.ok) {
-        const errorData = await response.json();
-        if (response.status === 400 && errorData.error === 'Already voted for this type') {
-          toast.error('You have already given feedback for this mood!', {
-            duration: 2000,
-            style: {
-              background: '#333',
-              color: '#fff',
-              borderRadius: '10px',
-            },
-          });
-          return;
-        }
-        throw new Error(errorData.error || 'Failed to submit feedback');
-      }
-      
-      const data = await response.json();
-      
-      if (!isValidFeedbackData(data)) {
-        console.error('Invalid feedback data received:', data);
-        throw new Error('Invalid feedback data received from server');
+        throw new Error('Failed to update feedback');
       }
 
-      // Update feedback state
-      setMeditationFeedback(data);
-      
-      // Add type to voted set and save to localStorage
-      const newVotedTypes = new Set(votedTypes).add(typeName);
-      setVotedTypes(newVotedTypes);
-      localStorage.setItem('votedTypes', JSON.stringify([...newVotedTypes]));
-      
-      // Show success message
-      toast.success('Thank you for your feedback!', {
-        duration: 2000,
-        style: {
-          background: '#333',
-          color: '#fff',
-          borderRadius: '10px',
-        },
-      });
+      const updatedFeedback = await response.json();
+      setMeditationFeedback(updatedFeedback);
     } catch (error) {
-      console.error('Failed to update feedback:', error);
-      toast.error('Something went wrong. Please try again later.');
+      console.error('Error updating feedback:', error);
     }
   };
-
-  useEffect(() => {
-    console.log('Current feedback state:', meditationFeedback);
-  }, [meditationFeedback]);
 
   // Add this useEffect to load voted types from localStorage
   useEffect(() => {
@@ -531,63 +479,39 @@ export default function MeditationTimer() {
             
             {/* Feedback Section */}
             <div className="flex justify-center gap-4 mt-2">
-              <div className="relative group">
-                <motion.button
-                  onClick={() => handleFeedback(type.name, true)}
-                  className={`flex items-center gap-1 transition-colors ${
-                    votedTypes.has(type.name)
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-green-500'
-                  }`}
-                  disabled={votedTypes.has(type.name)}
-                  whileTap={{ scale: votedTypes.has(type.name) ? 1 : 0.95 }}
+              <motion.button
+                onClick={() => handleFeedback(type.name)}
+                className={`flex items-center gap-1 transition-colors ${
+                  votedTypes.has(type.name)
+                    ? 'text-red-500'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-red-500'
+                }`}
+                whileHover={{ scale: 1.3 }}
+                whileTap={{ scale: 1.2 }}
+              >
+                <motion.span
+                  animate={votedTypes.has(type.name) ? {
+                    scale: [1, 1.2, 1],
+                    transition: {
+                      duration: 0.3,
+                      times: [0, 0.5, 1]
+                    }
+                  } : {}}
                 >
-                  👍
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={getFeedbackCounts(type.name).likes}
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="text-sm"
-                    >
-                      {getFeedbackCounts(type.name).likes}
-                    </motion.span>
-                  </AnimatePresence>
-                </motion.button>
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                  1 feedback per mood
-                </div>
-              </div>
-              
-              <div className="relative group">
-                <motion.button
-                  onClick={() => handleFeedback(type.name, false)}
-                  className={`flex items-center gap-1 transition-colors ${
-                    votedTypes.has(type.name)
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-red-500'
-                  }`}
-                  disabled={votedTypes.has(type.name)}
-                  whileTap={{ scale: votedTypes.has(type.name) ? 1 : 0.95 }}
-                >
-                  👎
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={getFeedbackCounts(type.name).dislikes}
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="text-sm"
-                    >
-                      {getFeedbackCounts(type.name).dislikes}
-                    </motion.span>
-                  </AnimatePresence>
-                </motion.button>
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
-                  1 feedback per mood
-                </div>
-              </div>
+                  ❤️
+                </motion.span>
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={getFeedbackCounts(type.name).likes}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="text-sm"
+                  >
+                    {getFeedbackCounts(type.name).likes}
+                  </motion.span>
+                </AnimatePresence>
+              </motion.button>
             </div>
           </div>
         ))}
